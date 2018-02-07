@@ -1,0 +1,5 @@
+.vscode
+debug
+images/*
+!images/.gitkeep
+client_secret.json
