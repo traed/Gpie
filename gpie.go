@@ -20,6 +20,7 @@ import (
 )
 
 const name string = "gpie"
+const imageDir string = "/usr/local/bildspel/images"
 
 // getClient uses a Context and Config to retrieve a Token
 // then generate a Client. It returns the generated Client.
@@ -119,7 +120,7 @@ func setupService() (*drive.Service, error) {
 }
 
 func getFilesList() map[string]bool {
-	files, err := ioutil.ReadDir("./images")
+	files, err := ioutil.ReadDir(imageDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -181,7 +182,7 @@ func main() {
 		for _, i := range res.Files {
 			if !files[i.Md5Checksum] {
 				fmt.Printf("%s downloading...\n", i.Name)
-				err := downloadFile(srv, i.Id, fmt.Sprintf("./images/%s%s", i.Md5Checksum, getExtension(i.Name)))
+				err := downloadFile(srv, i.Id, fmt.Sprintf("%s/%s%s", imageDir, i.Md5Checksum, getExtension(i.Name)))
 				if err != nil {
 					fmt.Printf("Unable to download file: %s\n", i.Name)
 					fmt.Println(err)
