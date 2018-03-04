@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -20,7 +22,8 @@ import (
 )
 
 const name string = "gpie"
-const imageDir string = "/usr/local/bildspel/images"
+
+var imageDir string
 
 // getClient uses a Context and Config to retrieve a Token
 // then generate a Client. It returns the generated Client.
@@ -165,7 +168,7 @@ func getExtension(name string) string {
 	return name[i:len(name)]
 }
 
-func main() {
+func updateFiles() {
 	srv, err := setupService()
 	if err != nil {
 		log.Fatalf("Unable to setup drive Client %v", err)
@@ -181,19 +184,42 @@ func main() {
 	if len(res.Files) > 0 {
 		for _, i := range res.Files {
 			if !files[i.Md5Checksum] {
-				fmt.Printf("%s downloading...\n", i.Name)
 				err := downloadFile(srv, i.Id, fmt.Sprintf("%s/%s%s", imageDir, i.Md5Checksum, getExtension(i.Name)))
 				if err != nil {
-					fmt.Printf("Unable to download file: %s\n", i.Name)
-					fmt.Println(err)
+					log.Println(err)
 				}
-			} else {
-				fmt.Printf("%s already downloaded.\n", i.Name)
 			}
 		}
-	} else {
-		fmt.Println("No files to download.")
+	}
+}
+
+func runFbi() {
+	fbi := fmt.Sprintf("fbi -a -noverbose -norandom -T 1 -t 8 `find %s -iname %s`", imageDir, "*.jpg")
+	err := exec.Command(fbi).Run()
+	if err != nil {
+		log.Fatalf("Unable to start fbi: %v", err)
+	}
+}
+
+func main() {
+	imageDir, _ = filepath.Abs("images")
+	if _, err := os.Stat(imageDir); os.IsNotExist(err) {
+		err := os.MkdirAll(imageDir, 0775)
+		if err != nil {
+			log.Fatalf("Unable to create image dir: %v", err)
+		}
 	}
 
-	fmt.Println("Exited.")
+	updateFiles()
+	runFbi()
+
+	ticker := time.NewTicker(5 * time.Minute)
+	for {
+		select {
+		case <-ticker.C:
+			exec.Command("pkill fbi").Run()
+			updateFiles()
+			runFbi()
+		}
+	}
 }
