@@ -122,20 +122,31 @@ func setupService() (*drive.Service, error) {
 	return drive.New(client)
 }
 
-func getFilesList() map[string]bool {
+func getFilesList() map[string]string {
 	files, err := ioutil.ReadDir(imageDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	names := make(map[string]bool)
+	names := make(map[string]string)
 	for _, f := range files {
 		s := f.Name()
 		i := strings.Index(s, ".")
-		names[s[:i]] = true
+		names[s[:i]] = s[i:]
 	}
 
 	return names
+}
+
+func getFilesListString() string {
+	files := getFilesList()
+
+	var str string
+	for name, ext := range files {
+		str += imageDir + "/" + name + ext + " "
+	}
+
+	return str
 }
 
 func downloadFile(srv *drive.Service, id string, filepath string) error {
@@ -183,7 +194,7 @@ func updateFiles() {
 
 	if len(res.Files) > 0 {
 		for _, i := range res.Files {
-			if !files[i.Md5Checksum] {
+			if _, exists := files[i.Md5Checksum]; exists {
 				err := downloadFile(srv, i.Id, fmt.Sprintf("%s/%s%s", imageDir, i.Md5Checksum, getExtension(i.Name)))
 				if err != nil {
 					log.Println(err)
@@ -194,10 +205,10 @@ func updateFiles() {
 }
 
 func runFbi() {
-	fbi := fmt.Sprintf("fbi -a -noverbose -norandom -T 1 -t 8 `find %s -iname %s`", imageDir, "*.jpg")
-	err := exec.Command(fbi).Run()
+	files := getFilesListString()
+	output, err := exec.Command("fbi", "-a", "-noverbose", "-norandom", "-t 8", files).CombinedOutput()
 	if err != nil {
-		log.Fatalf("Unable to start fbi: %v", err)
+		log.Fatalf("Unable to start fbi: %v", string(output))
 	}
 }
 
